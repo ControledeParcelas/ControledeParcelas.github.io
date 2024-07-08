@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Parcelas</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        margin: 0;
+        padding: 20px;
+    }
+    .container {
+        background-color: #ffffff;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        max-width: 600px;
+        margin: auto;
+        padding: 20px;
+        height: calc(100vh - 40px); /* Altura máxima da página menos o espaçamento */
+        overflow-y: auto; /* Habilita a rolagem vertical quando necessário */
+    }
+    h1 {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    label {
+        font-weight: bold;
+    }
+    input, select {
+        padding: 8px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    button {
+        padding: 10px;
+        font-size: 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    button:hover {
+        background-color: #45a049;
+    }
+    button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+    }
+    .payments {
+        margin-top: 20px;
+    }
+    .payment-item {
+        background-color: #f9f9f9;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-left: 4px solid #4CAF50;
+        border-radius: 4px;
+        position: relative;
+    }
+    .paid {
+        background-color: #f0f0f0;
+    }
+    .completed {
+        background-color: #dddddd;
+    }
+    .edit-button {
+        background-color: #2196F3;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        padding: 5px 10px;
+        font-size: 14px;
+        margin-left: 10px;
+    }
+    .edit-button:hover {
+        background-color: #0b7dda;
+    }
+    .payment-details {
+        margin-top: 8px;
+        font-size: 14px;
+        color: #666666;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Controle de Parcelas</h1>
+    <form id="parcelForm">
+        <label for="productName">Nome do Produto:</label>
+        <input type="text" id="productName" required>
+        
+        <label for="totalAmount">Valor Total (R$):</label>
+        <input type="number" id="totalAmount" min="0" step="0.01" required>
+
+        <label for="installmentAmount">Valor da Parcela (R$):</label>
+        <input type="number" id="installmentAmount" min="0" step="0.01" required>
+        
+        <label for="remainingInstallments">Parcelas Restantes:</label>
+        <input type="number" id="remainingInstallments" min="0" required>
+
+        <input type="hidden" id="editIndex"> <!-- Campo oculto para armazenar o índice do pagamento em edição -->
+
+        <button type="button" onclick="addOrUpdateParcel()">Adicionar Parcela</button>
+    </form>
+  
+  <h3>Desenvolvido por:<a href="https://jonasmartins2.github.io/?fbclid=PAZXh0bgNhZW0CMTEAAaY196fQ2BTXC7S6-ix0i9I29pdBOgFGCehvPvGuvoBr3nOqia7JJXbbBwQ_aem_xTuE6bqw4TlJTEK7ZJrA8A"> CLIQUE AQUI</a></h3>
+
+    <div class="payments" id="paymentsList">
+        <!-- Lista de parcelas pagas será exibida aqui -->
+    </div>
+</div>
+
+<script>
+    let payments = [];
+
+    // Função para carregar os dados salvos no localStorage
+    function loadPayments() {
+        const paymentsData = localStorage.getItem('payments');
+        if (paymentsData) {
+            payments = JSON.parse(paymentsData);
+            updateUI();
+        }
+    }
+
+    // Função para salvar os dados no localStorage
+    function savePayments() {
+        localStorage.setItem('payments', JSON.stringify(payments));
+    }
+
+    // Carregar os dados ao carregar a página
+    window.onload = function() {
+        loadPayments();
+    };
+
+    function addOrUpdateParcel() {
+        const productName = document.getElementById('productName').value;
+        const totalAmount = parseFloat(document.getElementById('totalAmount').value);
+        const installmentAmount = parseFloat(document.getElementById('installmentAmount').value);
+        const remainingInstallments = parseInt(document.getElementById('remainingInstallments').value);
+        const editIndex = document.getElementById('editIndex').value;
+
+        if (editIndex === '') {
+            // Adicionar novo pagamento
+            if (productName && totalAmount && installmentAmount && remainingInstallments > 0) {
+                const payment = {
+                    productName: productName,
+                    totalAmount: totalAmount,
+                    installmentAmount: installmentAmount,
+                    remainingInstallments: remainingInstallments,
+                    paymentsMade: [],
+                    status: "Em andamento"
+                };
+
+                payments.push(payment);
+                clearForm();
+                savePayments(); // Salvar os dados após adicionar um novo pagamento
+            }
+        } else {
+            // Atualizar pagamento existente
+            if (productName && totalAmount && installmentAmount && remainingInstallments > 0) {
+                payments[editIndex].productName = productName;
+                payments[editIndex].totalAmount = totalAmount;
+                payments[editIndex].installmentAmount = installmentAmount;
+                payments[editIndex].remainingInstallments = remainingInstallments;
+                clearForm();
+                document.getElementById('editIndex').value = ''; // Limpar o índice de edição
+                savePayments(); // Salvar os dados após atualizar um pagamento existente
+            }
+        }
+
+        updateUI();
+    }
+
+    function payInstallment(index) {
+        const payment = payments[index];
+        if (payment.remainingInstallments > 0) {
+            payment.paymentsMade.push({
+                amountPaid: payment.installmentAmount,
+                datePaid: new Date().toLocaleDateString()
+            });
+            payment.remainingInstallments--;
+            payment.totalAmount -= payment.installmentAmount; // Subtrair valor pago do total
+
+            if (payment.remainingInstallments === 0) {
+                payment.status = "Pago";
+            }
+
+            savePayments(); // Salvar os dados após pagar uma parcela
+            updateUI();
+        }
+    }
+
+    function deleteProduct(index) {
+        const confirmation = confirm("Tem certeza que deseja excluir este produto?");
+        if (confirmation) {
+            payments.splice(index, 1);
+            savePayments(); // Salvar os dados após excluir um produto
+            updateUI();
+        }
+    }
+
+    function editProduct(index) {
+        const payment = payments[index];
+        const newProductName = prompt("Digite o novo nome do produto:", payment.productName);
+        const newTotalAmount = parseFloat(prompt("Digite o novo valor total (R$):", payment.totalAmount.toFixed(2)));
+        const newInstallmentAmount = parseFloat(prompt("Digite o novo valor da parcela (R$):", payment.installmentAmount.toFixed(2)));
+        const newRemainingInstallments = parseInt(prompt("Digite o novo número de parcelas restantes:", payment.remainingInstallments));
+
+        if (newProductName !== null && !isNaN(newTotalAmount) && !isNaN(newInstallmentAmount) && !isNaN(newRemainingInstallments)) {
+            payments[index].productName = newProductName;
+            payments[index].totalAmount = newTotalAmount;
+            payments[index].installmentAmount = newInstallmentAmount;
+            payments[index].remainingInstallments = newRemainingInstallments;
+            savePayments(); // Salvar os dados após editar um produto
+            updateUI();
+        }
+    }
+
+    function clearForm() {
+        document.getElementById('productName').value = '';
+        document.getElementById('totalAmount').value = '';
+        document.getElementById('installmentAmount').value = '';
+        document.getElementById('remainingInstallments').value = '';
+    }
+
+    function updateUI() {
+        const paymentsList = document.getElementById('paymentsList');
+        paymentsList.innerHTML = '';
+
+        payments.forEach((payment, index) => {
+            const paymentItem = document.createElement('div');
+            paymentItem.classList.add('payment-item');
+            if (payment.status === "Pago") {
+                paymentItem.classList.add('paid');
+            }
+            if (payment.remainingInstallments === 0) {
+                paymentItem.classList.add('completed');
+            }
+
+            paymentItem.innerHTML = `
+                <strong>${payment.productName}</strong><br>
+                Valor Total: R$ ${payment.totalAmount.toFixed(2)}<br>
+                Parcelas Restantes: ${payment.remainingInstallments}<br>
+                Status: ${payment.status}
+            `;
+
+            const editButton = document.createElement('button');
+            editButton.textContent = "Editar";
+            editButton.classList.add('edit-button');
+            editButton.addEventListener('click', () => editProduct(index));
+            paymentItem.appendChild(editButton);
+
+            if (payment.status === "Pago") {
+                payment.paymentsMade.forEach(paymentMade => {
+                    const paymentDetails = document.createElement('div');
+                    paymentDetails.classList.add('payment-details');
+                    paymentDetails.innerHTML = `
+                        Parcela paga: R$ ${paymentMade.amountPaid.toFixed(2)} em ${paymentMade.datePaid}
+                    `;
+                    paymentItem.appendChild(paymentDetails);
+                });
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = "Excluir Produto";
+                deleteButton.addEventListener('click', () => deleteProduct(index));
+                paymentItem.appendChild(deleteButton);
+            } else {
+                const payButton = document.createElement('button');
+                payButton.textContent = "Pagar Parcela";
+                payButton.addEventListener('click', () => payInstallment(index));
+                paymentItem.appendChild(payButton);
+            }
+
+            paymentsList.appendChild(paymentItem);
+        });
+    }
+</script>
+</body>
+</html>
